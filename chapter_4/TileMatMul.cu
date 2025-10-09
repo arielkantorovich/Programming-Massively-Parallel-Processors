@@ -19,6 +19,54 @@ void PrintResults(float *P, int n)
     }
 }
 
+/**
+ * @brief Matrix Multiplication P = MN Tile teachnique include
+ * consider checking bounds.
+ * @param M - input matrix size (I, J)
+ * @param N - input matrix size (J, L)
+ * @param P - output matrix result (I, L)
+ * @note for simplicy, implementation assume sqaure matrices
+*/
+__global__
+void TileMatMulBounds(float *M, float *N, float *P, int n)
+{
+    __shared__ float Mds[TILE_SIZE][TILE_SIZE];
+    __shared__ float Nds[TILE_SIZE][TILE_SIZE];
+
+    int tx = threadIdx.x;           int ty = threadIdx.y;
+    int bx = blockIdx.x;            int by = blockIdx.y;
+    int Row = ty + by*TILE_SIZE;    int Col = tx + bx*TILE_SIZE;
+
+    float Pval = 0.0f;
+    for (int ph = 0; ph < ceil(n / TILE_SIZE); ph++)
+    {
+        if ((Row < n) && ((ph*TILE_SIZE+tx) < n))
+        {
+            Mds[ty][tx] = M[Row*n + ph * TILE_SIZE + tx];
+        }
+        else Mds[ty][tx] = 0.0f;
+
+        if ((ph * TILE_SIZE + ty) < n && (Col < n))
+        {
+            Nds[ty][tx] = N[Col + n * (ph * TILE_SIZE + ty)];
+        }
+        else Nds[ty][tx] = 0.0f;
+        
+        __syncthreads();
+
+        for (int k=0; k < TILE_SIZE; k++)
+        {
+            Pval += Mds[ty][k]*Nds[k][tx];
+        }
+        __syncthreads();
+    }
+
+    if (Row < n && Col < n)
+    {
+        P[Row*n + Col] = Pval;
+    }
+}
+
 
 /**
  * @brief Matrix Mulatiplication using tile technique P=MN
