@@ -30,6 +30,7 @@ void PrintResults(float *P, int n)
 __global__
 void TileMatMulBounds(float *M, float *N, float *P, int n)
 {
+    const int numTiles = (n + TILE_SIZE - 1) / TILE_SIZE;
     __shared__ float Mds[TILE_SIZE][TILE_SIZE];
     __shared__ float Nds[TILE_SIZE][TILE_SIZE];
 
@@ -38,7 +39,7 @@ void TileMatMulBounds(float *M, float *N, float *P, int n)
     int Row = ty + by*TILE_SIZE;    int Col = tx + bx*TILE_SIZE;
 
     float Pval = 0.0f;
-    for (int ph = 0; ph < ceil(n / TILE_SIZE); ph++)
+    for (int ph = 0; ph < numTiles; ph++)
     {
         if ((Row < n) && ((ph*TILE_SIZE+tx) < n))
         {
