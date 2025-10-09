@@ -1,12 +1,11 @@
 # ========= Compilers & Flags =========
 NVCC          := nvcc
 NVCCFLAGS     := -O2
-OPENCV_CFLAGS := $(shell pkg-config --cflags opencv4)
-OPENCV_LIBS   := $(shell pkg-config --libs   opencv4)
+
 
 # ========= Lists (same order!) =========
-TARGETS    := MatrixMult
-CUDA_FILES := MatMult.cu
+TARGETS    := MatrixMult Tile
+CUDA_FILES := MatMult.cu TileMatMul.cu
 # If you prefer auto-picking all .cu files:
 # CUDA_FILES := $(wildcard *.cu)
 # TARGETS    := color2gray imgBlur      # must have same count as CUDA_FILES
@@ -25,7 +24,7 @@ all: $(TARGETS)
 # Emit one rule per "tgt:src" pair using foreach
 define RULE_TEMPLATE
 $(1): $(2)
-	$$(NVCC) $$(NVCCFLAGS) $$(OPENCV_CFLAGS) $(2) -o $(1) $$(OPENCV_LIBS)
+	$$(NVCC) $$(NVCCFLAGS) $(2) -o $(1)
 endef
 $(foreach P,$(PAIRS), \
   $(eval $(call RULE_TEMPLATE,$(word 1,$(subst :, ,$(P))),$(word 2,$(subst :, ,$(P))))) \
