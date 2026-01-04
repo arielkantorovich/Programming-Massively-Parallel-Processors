@@ -3,8 +3,8 @@ NVCC      := nvcc
 NVCCFLAGS := -O2 -lineinfo -arch=sm_86
 
 # ========= Lists (same order!) =========
-TARGETS    := naive hist_privat smem
-CUDA_FILES := naive_hist.cu hist_privatization.cu hist_smem.cu
+TARGETS    := naive hist_privat smem interveal_smem
+CUDA_FILES := naive_hist.cu hist_privatization.cu hist_smem.cu interleaved_hist.cu
 
 # Sanity check: lengths must match
 ifneq ($(words $(TARGETS)),$(words $(CUDA_FILES)))
