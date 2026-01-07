@@ -32,3 +32,9 @@ void gray_hist_aggregate_kernel(const unsigned char* __restrict__ data,
 
 __host__
 void gray_histogram_main(cv::Mat img, unsigned int** h_hist);
+
+
+__global__
+void bgr_hist_aggregate_kernel(const unsigned char* __restrict__ data,
+                                unsigned int num_pixels,
+                                unsigned int* __restrict__ histo);

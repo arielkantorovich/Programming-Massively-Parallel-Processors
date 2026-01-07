@@ -1,5 +1,59 @@
 #include "histogram_cuda.cuh"
 
+/**
+ * @brief Implement histogram for BGR image
+ * @param data - input image layout as row major vector
+ * @param num_pixels - width * height
+ * @param histo - histogram results
+ */
+__global__
+void bgr_hist_aggregate_kernel(const unsigned char* __restrict__ data,
+                                unsigned int num_pixels,
+                                unsigned int* __restrict__ histo)
+{
+    // 3 separate shared memory histograms
+    __shared__ unsigned int h_smem_b[NUM_BINS];
+    __shared__ unsigned int h_smem_g[NUM_BINS];
+    __shared__ unsigned int h_smem_r[NUM_BINS];
+    
+    // Initialize all 3
+    for (unsigned int bin=threadIdx.x; bin < NUM_BINS; bin+=blockDim.x) {
+        h_smem_b[bin] = 0u;
+        h_smem_g[bin] = 0u;
+        h_smem_r[bin] = 0u;
+    }
+    __syncthreads();
+
+    unsigned int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    unsigned int step = blockDim.x * gridDim.x;
+
+    // Process BGR pixels (3 bytes per pixel)
+    for (unsigned int i=tid; i < num_pixels; i+=step) {
+        unsigned int pixel_idx = i * 3;
+        unsigned char b = data[pixel_idx + 0];
+        unsigned char g = data[pixel_idx + 1];
+        unsigned char r = data[pixel_idx + 2];
+        
+        unsigned int bin_b = b >> BIN_SHIFT;
+        unsigned int bin_g = g >> BIN_SHIFT;
+        unsigned int bin_r = r >> BIN_SHIFT;
+        
+        atomicAdd(&h_smem_b[bin_b], 1u);
+        atomicAdd(&h_smem_g[bin_g], 1u);
+        atomicAdd(&h_smem_r[bin_r], 1u);
+    }
+    __syncthreads();
+
+    // Merge to global memory (3 separate regions)
+    for (unsigned int bin=threadIdx.x; bin < NUM_BINS; bin+=blockDim.x) {
+        if (h_smem_b[bin] > 0)
+            atomicAdd(&histo[bin], h_smem_b[bin]);
+        if (h_smem_g[bin] > 0)
+            atomicAdd(&histo[NUM_BINS + bin], h_smem_g[bin]);
+        if (h_smem_r[bin] > 0)
+            atomicAdd(&histo[2*NUM_BINS + bin], h_smem_r[bin]);
+    }
+}
 
 /**
  * @brief Implement histogram for gray image (channel = 1)
