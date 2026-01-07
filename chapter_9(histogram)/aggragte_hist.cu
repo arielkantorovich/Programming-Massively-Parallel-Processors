@@ -32,7 +32,7 @@ void aggragte_histogram_kernel(const char* __restrict__ data,
 
                                 unsigned int tid = threadIdx.x + blockIdx.x * blockDim.x;
                                 unsigned int step = blockDim.x*gridDim.x;
-                                for (unsigned int i=tid; tid < length; tid+=step)
+                                for (unsigned int i=tid; i < length; i+=step)
                                 {
                                     int alphabeta_position = data[i] - 'a';
                                     if (alphabeta_position >= 0 && alphabeta_position < 26)
