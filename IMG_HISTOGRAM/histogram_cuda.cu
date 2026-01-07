@@ -39,9 +39,9 @@ void gray_hist_aggregate_kernel(const unsigned char* __restrict__ data,
                                         {
                                             if (acc > 0)
                                             {
-                                                atomicAdd(&h_smem[i], acc);
+                                                atomicAdd(&h_smem[prevBin], acc);
                                             }
-                                            
+
                                             prevBin = (int)bin;
                                             acc = 1u;
                                         }
@@ -64,3 +64,61 @@ void gray_hist_aggregate_kernel(const unsigned char* __restrict__ data,
                                         }
                                     }
                                 }
+
+
+/**
+ * @brief Main histogram implementation
+ * @param img gray image
+ * @param h_hist host histogram output pointer
+ * @note we assume that kernel work on Gray image level
+ * @note the kernel release the GPU memory after calculation but when finsh we need relese
+ * the host memory
+ */
+__host__
+void gray_histogram_main(cv::Mat img, unsigned int** h_hist)
+{
+    if (img.type() != CV_8UC1)
+    {
+        printf("Error in gray_histogram_main: type diffrent from CV_8UC1\n");
+        return;
+    }
+
+    // Allocate host memory
+    unsigned int NUM_PIXELS = static_cast<unsigned int>(img.cols * img.rows);
+    size_t SizeInBytes_hist = sizeof(unsigned int) * NUM_BINS;
+    size_t SizeInBytes_img = sizeof(unsigned char) * NUM_PIXELS;
+    cudaMallocHost((void**)h_hist, SizeInBytes_hist);
+
+    // Allocate device Memory
+    unsigned char* d_img;
+    unsigned int* d_hist;
+
+    cudaMalloc((void**)&d_img, SizeInBytes_img);
+    cudaMalloc((void**)&d_hist, SizeInBytes_hist);
+
+    // Initialize histogram to zero
+    cudaMemset(d_hist, 0, SizeInBytes_hist);
+
+    // Copy data from host to device
+    cudaMemcpy(d_img, img.data, SizeInBytes_img, cudaMemcpyHostToDevice);
+
+    // Define Grid Size
+    dim3 NumThreadPerBlock(256, 1, 1);
+    dim3 GridSize;
+    GridSize.z = 1;
+    GridSize.y = 1;
+    GridSize.x = (NUM_PIXELS + NumThreadPerBlock.x - 1) / NumThreadPerBlock.x;
+    
+    // Launch Kernel
+    gray_hist_aggregate_kernel <<<GridSize, NumThreadPerBlock>>> (d_img, NUM_PIXELS, d_hist);
+    cudaDeviceSynchronize();
+
+    // Move data from device to host
+    cudaMemcpy(*h_hist, d_hist, SizeInBytes_hist, cudaMemcpyDeviceToHost);
+
+    // Release device memory
+    cudaFree(d_hist);
+    cudaFree(d_img);
+
+    return;
+}

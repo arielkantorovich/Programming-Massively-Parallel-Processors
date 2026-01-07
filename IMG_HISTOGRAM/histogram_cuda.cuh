@@ -1,6 +1,8 @@
 #pragma once
 #include <cuda_runtime.h>
+#include "opencv2/opencv.hpp"
 #include <stdint.h>
+#include <stdio.h>
 
 
 /* ===============================
@@ -27,3 +29,6 @@ __global__
 void gray_hist_aggregate_kernel(const unsigned char* __restrict__ data,
                                 unsigned int num_pixels,
                                 unsigned int* __restrict__ histo);
+
+__host__
+void gray_histogram_main(cv::Mat img, unsigned int** h_hist);

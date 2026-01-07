@@ -32,44 +32,16 @@ int main(int argc, char **argv)
         printf("Error: runing command: ./<exe> <image_path>\n");
         return -1;
     }
-
+    // Read Image
     char *img_str = argv[1];
     cv::Mat h_img = cv::imread(img_str, cv::IMREAD_GRAYSCALE);
-    unsigned int NUM_PIXELS = static_cast<unsigned int>(h_img.cols * h_img.rows);
-    
 
-    // Allocate host memory
-    size_t SizeInBytes_hist = sizeof(unsigned int) * NUM_BINS;
-    size_t SizeInBytes_img = sizeof(unsigned char) * NUM_PIXELS;
-
+    // Launch histogram cuda Main
     unsigned int *h_hist;
-    cv::Mat cv_hist;
-    cudaMallocHost((void**)&h_hist, SizeInBytes_hist);
-
-    // Allocate device Memory
-    unsigned char* d_img;
-    unsigned int* d_hist;
-
-    cudaMalloc((void**)&d_img, SizeInBytes_img);
-    cudaMalloc((void**)&d_hist, SizeInBytes_hist);
-
-    // Copy data from host to device
-    cudaMemcpy(d_img, h_img.data, SizeInBytes_img, cudaMemcpyHostToDevice);
-
-    // Define Grid Size
-    dim3 NumThreadPerBlock(256, 1, 1);
-    dim3 GridSize;
-    GridSize.z = 1;
-    GridSize.y = 1;
-    GridSize.x = (NUM_PIXELS + NumThreadPerBlock.x - 1) / NumThreadPerBlock.x;
-
-    gray_hist_aggregate_kernel <<<GridSize, NumThreadPerBlock>>> (d_img, NUM_PIXELS, d_hist);
-    cudaDeviceSynchronize();
-
-    // Move data from device to host
-    cudaMemcpy(h_hist, d_hist, SizeInBytes_hist, cudaMemcpyDeviceToHost);
+    gray_histogram_main(h_img, &h_hist);
 
     // Calculate Hist in opencv
+    cv::Mat cv_hist;
     int histSize = 256;
     float range[] = { 0, 256 }; //the upper boundary is exclusive
     const float* histRange[] = { range };
@@ -82,8 +54,6 @@ int main(int argc, char **argv)
     // Free Host and Device Memory
     cudaFreeHost(h_hist);
     h_img.release();
-    cudaFree(d_img);
-    cudaFree(d_img);
 
     return 0;
 
