@@ -50,9 +50,9 @@ int main(int argc, char **argv)
     size_t SizeInBytes = sizeof(float) * N;
     cudaMallocHost((void**)&h_arr, SizeInBytes);
     h_out = (float*)malloc(sizeof(float));
-    for (int i=1; i < N; i++)
+    for (int i=0; i < N; i++)
     {
-        h_arr[i] = i;
+        h_arr[i] = i+1;
     }
     
     // Allocate Device Memory
