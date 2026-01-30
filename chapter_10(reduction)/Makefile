@@ -3,8 +3,8 @@ NVCC      := nvcc
 NVCCFLAGS := -O2 -lineinfo -arch=sm_86
 
 # ========= Lists (same order!) =========
-TARGETS    := naive_block_reduction
-CUDA_FILES := naive_block_reduction_sum.cu
+TARGETS    := naive_block_reduction shmem_reduction
+CUDA_FILES := naive_block_reduction_sum.cu shmem_reduction_sum.cu
 
 # Sanity check: lengths must match
 ifneq ($(words $(TARGETS)),$(words $(CUDA_FILES)))
