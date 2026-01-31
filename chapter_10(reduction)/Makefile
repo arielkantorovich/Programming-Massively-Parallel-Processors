@@ -1,10 +1,10 @@
 # ========= Compilers & Flags =========
 NVCC      := nvcc
-NVCCFLAGS := -O2 -lineinfo -arch=sm_86
+NVCCFLAGS := -ccbin /usr/bin/g++ -O2 -std=c++14 -lineinfo -arch=sm_86
 
 # ========= Lists (same order!) =========
-TARGETS    := naive_block_reduction shmem_reduction
-CUDA_FILES := naive_block_reduction_sum.cu shmem_reduction_sum.cu
+TARGETS    := naive_block_reduction shmem_reduction segment minimize_divergence
+CUDA_FILES := naive_block_reduction_sum.cu shmem_reduction_sum.cu segment_sum_reduction.cu minimize_divergence.cu
 
 # Sanity check: lengths must match
 ifneq ($(words $(TARGETS)),$(words $(CUDA_FILES)))
