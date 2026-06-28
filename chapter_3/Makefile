@@ -1,35 +1,48 @@
 # ========= Compilers & Flags =========
-NVCC          := nvcc
-NVCCFLAGS     := -O2
-OPENCV_CFLAGS := $(shell pkg-config --cflags opencv4)
-OPENCV_LIBS   := $(shell pkg-config --libs   opencv4)
+NVCC      := nvcc
+CXX       := g++
+NVCCFLAGS := -O2 -arch=sm_86
+CXXFLAGS  := -O2
+INCLUDES  := -Iincludes
 
-# ========= Lists (same order!) =========
-TARGETS    := color2gray imgBlur quary
-CUDA_FILES := colorToGreyscaleConversion.cu imageBlur.cu QueryingDevice.cu
-# If you prefer auto-picking all .cu files:
-# CUDA_FILES := $(wildcard *.cu)
-# TARGETS    := color2gray imgBlur      # must have same count as CUDA_FILES
+# OpenCV: use pkg-config when available (host); otherwise fall back to the
+# container's source-built install in /usr/local (which has no opencv4.pc).
+OPENCV_CFLAGS := $(shell pkg-config --cflags opencv4 2>/dev/null || echo -I/usr/local/include/opencv4)
+OPENCV_LIBS   := $(shell pkg-config --libs   opencv4 2>/dev/null || echo -L/usr/local/lib -lopencv_core -lopencv_imgcodecs -lopencv_imgproc -lopencv_highgui)
 
-# Sanity check: lengths must match
-ifneq ($(words $(TARGETS)),$(words $(CUDA_FILES)))
-$(error TARGETS and CUDA_FILES must have the same number of items)
-endif
+# ========= Binaries =========
+BIN := bin
 
-# Pair targets with sources element-wise: "tgt:src" "tgt:src" ...
-PAIRS := $(join $(addsuffix :,$(TARGETS)),$(CUDA_FILES))
+# 1) Image-processing pipeline (CUDA + OpenCV) -- UNCHANGED
+APP          := $(BIN)/imgproc
+APP_SOURCES  := main.cpp src/ImageProceesing.cu
+APP_HEADERS  := includes/ImageProcessing.cuh
+
+# 2) CPU box-filter blur (OpenCV C++ API, no CUDA)
+BLUR         := $(BIN)/blur_cpu
+BLUR_SOURCES := src/ImgBlur_cpu.c
+
+# 3) Device query (CUDA only, no OpenCV)
+QUERY         := $(BIN)/device_query
+QUERY_SOURCES := src/QueryingDevice.cu
 
 .PHONY: all clean
-all: $(TARGETS)
+all: $(APP) $(BLUR) $(QUERY)
 
-# Emit one rule per "tgt:src" pair using foreach
-define RULE_TEMPLATE
-$(1): $(2)
-	$$(NVCC) $$(NVCCFLAGS) $$(OPENCV_CFLAGS) $(2) -o $(1) $$(OPENCV_LIBS)
-endef
-$(foreach P,$(PAIRS), \
-  $(eval $(call RULE_TEMPLATE,$(word 1,$(subst :, ,$(P))),$(word 2,$(subst :, ,$(P))))) \
-)
+# nvcc compiles the .cu (device) and forwards main.cpp to host g++, then links.
+$(APP): $(APP_SOURCES) $(APP_HEADERS) | $(BIN)
+	$(NVCC) $(NVCCFLAGS) $(INCLUDES) $(OPENCV_CFLAGS) $(APP_SOURCES) -o $@ $(OPENCV_LIBS)
+
+# .c file actually uses the OpenCV C++ API -> force C++ with -x c++.
+$(BLUR): $(BLUR_SOURCES) | $(BIN)
+	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -x c++ $(BLUR_SOURCES) -o $@ $(OPENCV_LIBS)
+
+# Pure CUDA, no OpenCV.
+$(QUERY): $(QUERY_SOURCES) | $(BIN)
+	$(NVCC) $(NVCCFLAGS) $(QUERY_SOURCES) -o $@
+
+$(BIN):
+	mkdir -p $(BIN)
 
 clean:
-	rm -f $(TARGETS)
+	rm -f $(APP) $(BLUR) $(QUERY)
