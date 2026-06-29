@@ -30,4 +30,19 @@ $(foreach P,$(PAIRS), \
 )
 
 clean:
-	rm -f $(TARGETS)
+	rm -f $(TARGETS) *.nsys-rep *.sqlite *.ncu-rep
+
+# ========= Profiling =========
+# Timeline + kernel/memcpy throughput (NO perf-counter perms needed; works in WSL2/Docker)
+.PHONY: nsys ncu occ
+nsys: $(firstword $(TARGETS))
+	nsys profile -o $<_prof --stats=true --force-overwrite=true ./$<
+
+# Full hardware metrics: occupancy, throughput, etc. (needs counters unlocked, see README)
+ncu: $(firstword $(TARGETS))
+	ncu --set full -f -o $<_ncu ./$<
+
+# Quick occupancy/throughput summary printed to stdout
+occ: $(firstword $(TARGETS))
+	ncu --metrics sm__throughput.avg.pct_of_peak_sustained_elapsed,\
+gpu__time_duration.sum,sm__warps_active.avg.pct_of_peak_sustained_active ./$<

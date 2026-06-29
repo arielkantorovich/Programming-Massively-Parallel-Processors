@@ -12,6 +12,10 @@ nvcc -O2 -arch=sm_xy -lineinfo name.cu -o name
 ```
 ncu -o report <cuda exe>
 ```
+* another option that print metrices
+```
+ncu --set full ./your_program          # all metrics
+```
 3. Generate nsight system report
 ```
 nsys profile -o report <cuda exe>
