@@ -1,34 +1,67 @@
-# ========= Compilers & Flags =========
-NVCC          := nvcc
-NVCCFLAGS     := -O2
+# ==========================================================
+# chapter_4 - CUDA + host C++ build
+# Builds:  main.cpp + src/*.cu   ->   bin/main
+# ==========================================================
 
+# ----- Automatic Variables ------------------
+# - $@ = the target being built
+# - $< = the first prerequisite (the source file)
+# - $^ = all prerequisites (all the .o files)
+# - $(dir $@) = directory part of the target
+# --------------------------------------------
 
-# ========= Lists (same order!) =========
-TARGETS    := MatrixMult Tile
-CUDA_FILES := MatMult.cu TileMatMul.cu
-# If you prefer auto-picking all .cu files:
-# CUDA_FILES := $(wildcard *.cu)
-# TARGETS    := color2gray imgBlur      # must have same count as CUDA_FILES
+# ---- 1. Toolchain ----
+# We drive the WHOLE build through nvcc (not g++) because:
+#   * src/MatrixMultOperations.cu contains device code -> only nvcc understands <<<>>> and __global__
+#   * main.cpp #includes MatrixMultOperations.cuh -> which pulls in <cuda_runtime.h>
+#   * the final link must pull in the CUDA runtime (-lcudart), which nvcc adds for us
+# nvcc compiles host (.cpp) code by forwarding it to g++ under the hood.
+NVCC      := nvcc
+ARCH      := sm_86                 # RTX 2050 = compute capability 8.6. Override: make ARCH=sm_75
+NVCCFLAGS := -std=c++17 -O2 -arch=$(ARCH) -Iincludes
+#            |          |   |              └ where to find MatrixMultOperations.cuh
+#            |          |   └ generate SASS for this exact GPU architecture
+#            |          └ optimization level
+#            └ C++ standard
 
-# Sanity check: lengths must match
-ifneq ($(words $(TARGETS)),$(words $(CUDA_FILES)))
-$(error TARGETS and CUDA_FILES must have the same number of items)
-endif
+# ---- 2. Project layout ----
+SRC_DIR  := src
+INC_DIR  := includes
+BIN_DIR  := bin
 
-# Pair targets with sources element-wise: "tgt:src" "tgt:src" ...
-PAIRS := $(join $(addsuffix :,$(TARGETS)),$(CUDA_FILES))
+# ---- 3. Collect sources, derive object + exe names ----
+CPP_SRCS := main.cpp $(wildcard $(SRC_DIR)/*.cpp)   # host C++ sources
+CU_SRCS  := $(wildcard $(SRC_DIR)/*.cu)             # CUDA device sources
+SRCS     := $(CPP_SRCS) $(CU_SRCS)
+# Keep the original extension inside the object name so that
+# src/foo.cpp and src/foo.cu do NOT both map to the same foo.o:
+#   main.cpp                       -> bin/main.cpp.o
+#   src/MatrixMultOperations.cu    -> bin/src/MatrixMultOperations.cu.o
+OBJS     := $(SRCS:%=$(BIN_DIR)/%.o)
+HEADERS  := $(wildcard $(INC_DIR)/*.hpp) $(wildcard $(INC_DIR)/*.cuh)
+TARGET   := $(BIN_DIR)/main                          # final program
 
-.PHONY: all clean
-all: $(TARGETS)
+# ---- 4. Targets that are NOT real files ----
+.PHONY: all run clean
+# Default goal: just running `make` builds the program
+all: $(TARGET)
 
-# Emit one rule per "tgt:src" pair using foreach
-define RULE_TEMPLATE
-$(1): $(2)
-	$$(NVCC) $$(NVCCFLAGS) $(2) -o $(1)
-endef
-$(foreach P,$(PAIRS), \
-  $(eval $(call RULE_TEMPLATE,$(word 1,$(subst :, ,$(P))),$(word 2,$(subst :, ,$(P))))) \
-)
+# ---- 5. LINK: stitch all .o files into one executable (nvcc adds -lcudart) ----
+$(TARGET): $(OBJS)
+	$(NVCC) $(NVCCFLAGS) $^ -o $@
 
+# ---- 6. COMPILE: one source -> one .o ----
+# Any header change forces a rebuild (HEADERS listed as a prerequisite).
+$(BIN_DIR)/%.cpp.o: %.cpp $(HEADERS)
+	@mkdir -p $(dir $@)
+	$(NVCC) $(NVCCFLAGS) -c $< -o $@
+
+$(BIN_DIR)/%.cu.o: %.cu $(HEADERS)
+	@mkdir -p $(dir $@)
+	$(NVCC) $(NVCCFLAGS) -c $< -o $@
+
+# ---- 7. Convenience helpers ----
+run: $(TARGET)
+	./$(TARGET)
 clean:
-	rm -f $(TARGETS)
+	rm -rf $(BIN_DIR)
