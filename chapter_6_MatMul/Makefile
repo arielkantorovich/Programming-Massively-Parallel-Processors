@@ -1,6 +1,6 @@
 # ========= Compilers & Flags =========
 NVCC      := nvcc
-NVCCFLAGS := -O2 -lineinfo -arch=sm_86 -Iincludes
+NVCCFLAGS := -O2 -lineinfo -arch=sm_86 -Xptxas -v -Iincludes
 
 # ========= Sources / target =========
 SRC       := src/GEMM.cu src/main.cu
